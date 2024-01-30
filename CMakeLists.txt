@@ -9,8 +9,13 @@ find_package(OpenGL REQUIRED)
 add_library(glad STATIC glad/src/glad.c)
 target_include_directories(glad PUBLIC glad/include)
 
-aux_source_directory(source demo_src)
+macro(gen_executable target target_src)
+	add_executable(${target} ${target}.cpp ${target_src})
+	target_include_directories(${target} PRIVATE include/)
+	target_link_libraries(${target} PRIVATE glfw glad dl)
+endmacro()
 
-add_executable(demo1 demo1.cpp ${demo_src})
-target_include_directories(demo1 PRIVATE include/)
-target_link_libraries(demo1 PRIVATE glfw glad dl)
+aux_source_directory(source target_src)
+
+gen_executable(demo1 ${target_src})
+gen_executable(demo2 ${target_src})

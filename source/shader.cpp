@@ -16,8 +16,8 @@ Shader::Shader(const char* vert_shader_path, const char* frag_shader_path) {
   fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
   try {
     // 打开文件
-    vShaderFile.open(vert_shader_path);
-    fShaderFile.open(frag_shader_path);
+    vShaderFile.open(vert_shader_path, std::ios::in);
+    fShaderFile.open(frag_shader_path, std::ios::in);
     std::stringstream vShaderStream, fShaderStream;
     // 读取文件的缓冲内容到数据流中
     vShaderStream << vShaderFile.rdbuf();

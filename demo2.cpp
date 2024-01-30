@@ -1,9 +1,11 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
+
 #include <cmath>
 #include <cstring>
-#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -11,21 +13,20 @@
 
 const int g_width = 600;
 const int g_height = 400;
-
-// GLfloat vertices[] = {
-//     0.5f,  0.5f,  0.0f,  // 右上
-//     0.5f,  -0.5f, 0.0f,  // 右下
-//     -0.5f, 0.5f,  0.0f,  // 左上
-//     -0.5f, -0.5f, 0.0f,  // 左下
-// };
+int g_tex_wid;
+int g_tex_hei;
+int nr_channels;
 
 // 顶点坐标
 GLfloat vertices[] = {
-    // 位置                            // 颜色
-    0.5f,  -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,  // 右下
-    -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,  // 左下
-    0.0f,  0.5f,  0.0f, 0.0f, 0.0f, 1.0f   // 顶部
+    // positions          // colors           // texture coords
+    0.5f,  0.5f,  0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,  // top right
+    0.5f,  -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // bottom right
+    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,  // bottom left
+    -0.5f, 0.5f,  0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f   // top left
 };
+
+const int stride = 8;
 
 // 纹理坐标
 GLfloat texCoords[] = {
@@ -33,8 +34,6 @@ GLfloat texCoords[] = {
     1.0f, 0.0f,  // 右下角
     0.5f, 1.0f   // 上中
 };
-
-const int stride = 6;
 
 GLuint indices[] = {
     0, 1, 2,  // 第一个三角形
@@ -76,53 +75,8 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  // // 读取着色器代码
-  // std::ifstream ifs;
-  // ifs.open("shader/demo1/vertex_shader.glsl", std::ios::in);
-  // std::string vertexShaderSource{std::istreambuf_iterator<char>(ifs),
-  //                                std::istreambuf_iterator<char>()};
-  // ifs.close();
-  // ifs.open("shader/demo1/fragment_shader.glsl", std::ios::in);
-  // std::string fragmentShaderSource{std::istreambuf_iterator<char>(ifs),
-  //                                  std::istreambuf_iterator<char>()};
-  // ifs.close();
-
-  // const char* vert_source = vertexShaderSource.c_str();
-  // const char* frag_source = fragmentShaderSource.c_str();
-
-  // // 3. 创建Shader，指定着色器代码，编译着色器，链接着色器
-  // GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-  // glShaderSource(vertexShader, 1, &vert_source, NULL);
-  // glCompileShader(vertexShader);
-  // int success = 0;
-  // char infoLog[512] = {0};
-  // glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-  // if (!success) {
-  //   glad_glGetShaderInfoLog(vertexShader, sizeof(infoLog), NULL, infoLog);
-  //   std::cerr << "顶点着色器编译错误: " << infoLog << std::endl;
-  // }
-  // GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-  // glShaderSource(fragmentShader, 1, &frag_source, NULL);
-  // glCompileShader(fragmentShader);
-  // std::memset(infoLog, 0, sizeof(infoLog));
-  // glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-  // if (!success) {
-  //   glad_glGetShaderInfoLog(vertexShader, sizeof(infoLog), NULL, infoLog);
-  //   std::cerr << "片段着色器编译错误: " << infoLog << std::endl;
-  // }
-  // GLuint shaderProgram = glCreateProgram();
-  // glAttachShader(shaderProgram, vertexShader);
-  // glAttachShader(shaderProgram, fragmentShader);
-  // glLinkProgram(shaderProgram);
-  // glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-  // if (!success) {
-  //   glGetProgramInfoLog(shaderProgram, sizeof(infoLog), NULL, infoLog);
-  //   std::cerr << "着色器链接错误: " << infoLog << std::endl;
-  // }
-  // glDeleteShader(vertexShader);
-  // glDeleteShader(fragmentShader);
-  Shader* shader = new Shader("shader/demo1/vertex_shader.glsl",
-                              "shader/demo1/fragment_shader.glsl");
+  Shader* shader =
+      new Shader("shader/demo2/vertex.glsl", "shader/demo2/fragment.glsl");
 
   // 4. 创建VBO、VAO、EBO
   GLuint VBO, VAO, EBO;
@@ -147,15 +101,44 @@ int main() {
   // 7.2 颜色属性
   glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat),
                         (void*)(3 * sizeof(GLfloat)));
+  // 7.3 纹理属性
+  glad_glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat),
+                             (void*)(6 * sizeof(GLfloat)));
 
   // 8. 启用顶点属性
   glEnableVertexAttribArray(0);  // 启用位置属性
   glEnableVertexAttribArray(1);  // 启用颜色属性
+  glEnableVertexAttribArray(2);  // 启用纹理属性
 
   // 之后我们不需要用到VBO了，因此可以解绑
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-  // 9. 渲染循环
+  // 9. 加载图片并创建纹理
+  // 9.1 创建纹理对象
+  GLuint texture;
+  glGenTextures(1, &texture);
+  // 9.2 将纹理对象绑定到GL_TEXTURE_2D上
+  glBindTexture(GL_TEXTURE_2D, texture);
+  // 9.3 设置纹理环绕方式
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+  // 9.4 设置纹理过滤方式并生成多级渐远纹理
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                  GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  // 9.5 加载图像
+  unsigned char* data = stbi_load("resource/texture/container.jpg", &g_tex_wid,
+                                  &g_tex_hei, &nr_channels, 0);
+  if (data) {
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, g_tex_wid, g_tex_hei, 0, GL_RGB,
+                 GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+  } else {
+    std::cout << "Failed to load texture" << std::endl;
+  }
+  stbi_image_free(data);
+
+  // 10. 渲染循环
   while (!glfwWindowShouldClose(win)) {
     // 处理输入
     processInput(win);
@@ -164,31 +147,14 @@ int main() {
     glClearColor(0.2f, 0.3f, 0.3f, 0.5f);
     glClear(GL_COLOR_BUFFER_BIT);
 
+    // 绑定纹理
+    glBindTexture(GL_TEXTURE_2D, texture);
+
     // 绘制图元
-    // glUseProgram(shaderProgram);  //
     // 进行绘图操作和更改Uniform需要先启用着色器【这句话也可以移到循环外，因为这里只有一个shader】
     shader->useProgram();
 
-    static int cnt = 2;
-    if (cnt & 1) {
-      static GLfloat offset = 0;
-      std::cout << offset << std::endl;
-      offset += 0.2;
-      shader->setFloat("offset",
-                       std::sin(offset));  // 用sin来将值映射在[-1,1]内
-    }
-    cnt++;
-
-    // GLdouble rgbGreenValue = (std::sin(timeValue) / 2.0f) + 0.5f;
-    // int vertexColorLocation = glGetUniformLocation(shaderProgram,
-    // "ourColor"); if (vertexColorLocation == -1) {
-    //   std::cerr << "渲染管线中没有找到指定的Uniform" << std::endl;
-    //   goto exit;
-    // }
-    // glUniform4f(vertexColorLocation, 0.0f, rgbGreenValue, 0.0f, 1.0f);
-
     glBindVertexArray(VAO);
-    // glDrawArrays(GL_TRIANGLES, 0, 3);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);  // 使用顶点索引
 
     // 缓冲区翻页并处理窗口事件
@@ -197,7 +163,7 @@ int main() {
   }
 
 exit:
-  // 10. 回收资源
+  // 11. 回收资源
   glfwDestroyWindow(win);
   glDeleteVertexArrays(1, &VAO);
   glDeleteBuffers(1, &EBO);
